@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { INIT, CH_NAME, getRoute, unlockAudio } from "./constants.js";
+import { INIT, CH_NAME, getRoute, unlockAudio, LS_STATE } from "./constants.js";
 import { reducer } from "./reducer.js";
 import HomeScreen  from "./screens/HomeScreen.jsx";
 import GameScreen  from "./screens/GameScreen.jsx";
@@ -9,6 +9,24 @@ export default function App() {
   const [route, setRoute] = useState(getRoute());
   const [G, rawSet]       = useState(INIT());
   const chRef             = useRef(null);
+
+  // Carga preguntas desde /preguntas.json si localStorage no tiene ninguna
+  useEffect(()=>{
+    const hasQ = G.questions?.length > 0 && G.questions[0]?.id !== undefined;
+    if (hasQ) return;
+    fetch("/preguntas.json")
+      .then(r => r.json())
+      .then(qs => {
+        if (!qs?.length) return;
+        rawSet(prev => {
+          const next = {...prev, questions: qs};
+          const { overlayType, overlayData, ...rest } = next;
+          localStorage.setItem(LS_STATE, JSON.stringify(rest));
+          return next;
+        });
+      })
+      .catch(()=>{});
+  }, []);
 
   // Unlock AudioContext on first user gesture (fixes autoplay policy)
   useEffect(()=>{

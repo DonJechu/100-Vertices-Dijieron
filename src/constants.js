@@ -98,23 +98,7 @@ export const saveTournament = (t) => {
 /* ═══════════════════════════════════════════════════
    DEFAULT QUESTIONS
 ═══════════════════════════════════════════════════ */
-export const DEFAULT_Q = [
-  { id:1,  question:"¿Cuál es la comida mexicana más popular?",            answers:[{text:"Tacos",pts:45},{text:"Enchiladas",pts:20},{text:"Tamales",pts:15},{text:"Pozole",pts:10},{text:"Chiles en Nogada",pts:5},{text:"Mole",pts:5}]},
-  { id:2,  question:"¿Qué bebida toman los mexicanos en las fiestas?",     answers:[{text:"Cerveza",pts:40},{text:"Tequila",pts:30},{text:"Mezcal",pts:12},{text:"Michelada",pts:10},{text:"Agua fresca",pts:5},{text:"Tepache",pts:3}]},
-  { id:3,  question:"¿Qué animal se asocia más con México?",               answers:[{text:"Águila",pts:38},{text:"Perro Xolo",pts:22},{text:"Serpiente",pts:15},{text:"Burro",pts:12},{text:"Gallo",pts:8},{text:"Iguana",pts:5}]},
-  { id:4,  question:"Nombre algo que lleves siempre en la bolsa",          answers:[{text:"Celular",pts:42},{text:"Cartera",pts:28},{text:"Llaves",pts:16},{text:"Audífonos",pts:8},{text:"Chicles",pts:4},{text:"Plumas",pts:2}]},
-  { id:5,  question:"¿Cuál es el destino turístico más visitado?",         answers:[{text:"Cancún",pts:42},{text:"CDMX",pts:28},{text:"Los Cabos",pts:12},{text:"Guadalajara",pts:8},{text:"Puerto Vallarta",pts:6},{text:"Oaxaca",pts:4}]},
-  { id:6,  question:"¿Qué no puede faltar en una fiesta mexicana?",        answers:[{text:"Música",pts:38},{text:"Comida",pts:28},{text:"Tequila",pts:18},{text:"Piñata",pts:10},{text:"Familia",pts:4},{text:"Bailar",pts:2}]},
-  { id:7,  question:"¿Qué hace la gente en Semana Santa?",                answers:[{text:"Viaja a la playa",pts:40},{text:"Va a misa",pts:28},{text:"Descansa en casa",pts:16},{text:"Visita familia",pts:10},{text:"Come mariscos",pts:4},{text:"No hace nada",pts:2}]},
-  { id:8,  question:"¿Cuál es el platillo favorito de los domingos?",      answers:[{text:"Carne asada",pts:38},{text:"Pozole",pts:24},{text:"Barbacoa",pts:18},{text:"Menudo",pts:10},{text:"Birria",pts:6},{text:"Tamales",pts:4}]},
-  { id:9,  question:"Nombre una razón por la que lloran los mexicanos",    answers:[{text:"Amor",pts:36},{text:"Películas",pts:26},{text:"Familia",pts:18},{text:"Futbol",pts:12},{text:"Nostalgia",pts:5},{text:"Trabajo",pts:3}]},
-  { id:10, question:"¿Cuál es el mejor mes para visitar México?",          answers:[{text:"Diciembre",pts:35},{text:"Marzo",pts:25},{text:"Julio",pts:20},{text:"Octubre",pts:12},{text:"Mayo",pts:5},{text:"Enero",pts:3}]},
-  { id:11, question:"¿Cuál es el deporte más popular en México?",          answers:[{text:"Futbol",pts:50},{text:"Beisbol",pts:20},{text:"Boxeo",pts:14},{text:"Lucha libre",pts:8},{text:"Basquetbol",pts:5},{text:"Tenis",pts:3}]},
-  { id:12, question:"Nombre algo que nunca falta en una cocina mexicana",  answers:[{text:"Chile",pts:40},{text:"Tortillas",pts:30},{text:"Frijoles",pts:16},{text:"Aceite",pts:8},{text:"Ajo",pts:4},{text:"Sal",pts:2}]},
-  { id:13, question:"¿Qué regalo dan los mexicanos en cumpleaños?",        answers:[{text:"Dinero",pts:38},{text:"Ropa",pts:26},{text:"Pastel",pts:18},{text:"Perfume",pts:10},{text:"Juguetes",pts:5},{text:"Flores",pts:3}]},
-  { id:14, question:"¿Cuál es la canción más cantada en fiestas?",         answers:[{text:"Las Mañanitas",pts:44},{text:"Cielito Lindo",pts:24},{text:"La Bamba",pts:16},{text:"Guadalajara",pts:8},{text:"México Lindo",pts:5},{text:"El Rey",pts:3}]},
-  { id:15, question:"¿Qué hacen los mexicanos el 15 de septiembre?",       answers:[{text:"Van al Zócalo",pts:36},{text:"Ven el Grito en TV",pts:28},{text:"Hacen fiesta en casa",pts:20},{text:"Comen pozole",pts:10},{text:"Ponen música",pts:4},{text:"Nada especial",pts:2}]},
-];
+export const DEFAULT_Q = [];
 
 /* ═══════════════════════════════════════════════════
    GAME STATE
@@ -130,33 +114,14 @@ export const BLANK = (questions, questionsPerMatch) => ({
 });
 
 export const INIT = () => {
-  const saved  = (()=>{ try { return JSON.parse(localStorage.getItem(LS_STATE)); } catch { return null; } })();
-  const savedQ = (()=>{ try { return JSON.parse(localStorage.getItem(LS_Q));     } catch { return null; } })();
-  if (!saved) return BLANK(savedQ);
-  return {
-    ...BLANK(savedQ),
-    teamA:      saved.teamA      ?? {name:"Familia 1",score:0},
-    teamB:      saved.teamB      ?? {name:"Familia 2",score:0},
-    gameMode:   saved.gameMode   ?? "familiar",
-    questionsPerMatch: saved.questionsPerMatch ?? null,
-    currentQ:   saved.currentQ   ?? 0,
-    revealed:   saved.revealed   ?? [],
-    strikes:    saved.strikes    ?? 0,
-    roundPts:   saved.roundPts   ?? 0,
-    activeTeam: saved.activeTeam ?? "A",
-    stealMode:  saved.stealMode  ?? false,
-    phase:      saved.phase      ?? "playing",
-    facePhase:  saved.facePhase  ?? "idle",
-    faceNameA:  saved.faceNameA  ?? "",
-    faceNameB:  saved.faceNameB  ?? "",
-    faceWinner: saved.faceWinner ?? null,
-    qrMode:     saved.qrMode     ?? false,
-    qrStartIdx: saved.qrStartIdx ?? 0,
-    qrCurrentQ: saved.qrCurrentQ ?? 0,
-    qrRevealed: saved.qrRevealed ?? [],
-    qrScoreA:   saved.qrScoreA   ?? 0,
-    qrScoreB:   saved.qrScoreB   ?? 0,
-  };
+  const saved = (()=>{ try { return JSON.parse(localStorage.getItem(LS_STATE)); } catch { return null; } })();
+  if (!saved) {
+    // Primera vez: intenta cargar banco de preguntas de LS_Q (legado)
+    const savedQ = (()=>{ try { return JSON.parse(localStorage.getItem(LS_Q)); } catch { return null; } })();
+    return BLANK(savedQ);
+  }
+  // Estado completo guardado — questions ya viene dentro de saved
+  return { ...BLANK(null), ...saved, overlayType:null, overlayData:{} };
 };
 
 /* ═══════════════════════════════════════════════════

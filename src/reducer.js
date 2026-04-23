@@ -1,9 +1,9 @@
 import { BLANK, DEFAULT_Q, LS_Q, LS_STATE, SFX } from "./constants.js";
 
 export function reducer(S, action) {
-  const saveQ = q => { localStorage.setItem(LS_Q, JSON.stringify(q)); return q; };
+  const saveQ = q => q;
   const persist = next => {
-    const { overlayType, overlayData, questions, ...rest } = next;
+    const { overlayType, overlayData, ...rest } = next;
     localStorage.setItem(LS_STATE, JSON.stringify(rest));
     return next;
   };
@@ -122,14 +122,17 @@ export function reducer(S, action) {
 
     /* ── Setup a new match: shuffle bank, apply multipliers, set teams ── */
     case "SETUP_MATCH": {
-      const cfg  = action.cfg;
-      const n    = cfg.questionsPerMatch ?? 5;
+      const cfg   = action.cfg;
+      const n     = cfg.questionsPerMatch ?? 5;
       const mults = cfg.multipliers ?? [];
 
-      // Load question bank from localStorage (full set edited by user)
-      let bank;
-      try { bank = JSON.parse(localStorage.getItem(LS_Q)) || S.questions; }
-      catch { bank = S.questions; }
+      // Banco completo: preferir questionBank del estado, luego LS_STATE, luego LS_Q (legado)
+      let bank = S.questionBank || S.questions;
+      try {
+        const saved = JSON.parse(localStorage.getItem(LS_STATE));
+        if (saved?.questionBank?.length) bank = saved.questionBank;
+        else if (saved?.questions?.length) bank = saved.questions;
+      } catch {}
       if (!bank || bank.length === 0) bank = DEFAULT_Q;
 
       // Shuffle and pick n questions
@@ -144,7 +147,8 @@ export function reducer(S, action) {
       localStorage.removeItem(LS_STATE);
       next = {
         ...BLANK(bank, n),
-        questions:  matchQ,
+        questions:     matchQ,       // preguntas del match actual (shuffleadas)
+        questionBank:  bank,         // banco completo para el editor
         questionsPerMatch: n,
         teamA: {name: action.teamA, score: 0},
         teamB: {name: action.teamB, score: 0},
@@ -152,7 +156,7 @@ export function reducer(S, action) {
       };
       break;
     }
-
+    
     /* ── Cara a cara (legacy — kept for state compat) ── */
     case "FACE_SET_NAME": { const f=action.t==="A"?"faceNameA":"faceNameB"; next={...S,[f]:action.v}; break; }
     case "FACE_START_A":  next = {...S, facePhase:"leaderA"}; break;
@@ -227,14 +231,17 @@ export function reducer(S, action) {
       break;
     }
     case "EDIT_Q": {
-      const qs = S.questions.map((q,i)=>i===action.i?{...q,[action.f]:action.v}:q);
-      saveQ(qs); next={...S,questions:qs}; break;
+      const bank = S.questionBank ?? S.questions;
+      const qs = bank.map((q,i)=>i===action.i?{...q,[action.f]:action.v}:q);
+      saveQ(qs); next={...S, questionBank:qs}; break;
     }
     case "EDIT_A": {
-      const qs = S.questions.map((q,i)=>i===action.i
+      const bank = S.questionBank ?? S.questions;
+      const qs = bank.map((q,i)=>i===action.i
         ?{...q,answers:q.answers.map((a,j)=>j===action.j?{...a,[action.f]:action.v}:a)}:q);
-      saveQ(qs); next={...S,questions:qs}; break;
+      saveQ(qs); next={...S, questionBank:qs}; break;
     }
+    
     case "RST_Q": {
       const qs = saveQ(JSON.parse(JSON.stringify(DEFAULT_Q)));
       next = {...S, questions:qs, currentQ:0, revealed:[], roundPts:0};

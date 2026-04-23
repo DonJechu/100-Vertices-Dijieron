@@ -1017,16 +1017,18 @@ function EditorTab({ G, dispatch }) {
   const multColor = (m) => m===3?"#7c3aed":m===2?"#ea580c":A.border;
   const multLabel = (m) => m===3?"×3 TRIPLE":m===2?"×2 DOBLE":"×1 Normal";
 
+  // Siempre editar el banco completo, no el subconjunto del match activo
+  const bank = G.questionBank ?? G.questions;
   return (
     <>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:8}}>
-        <span style={{fontWeight:600, fontSize:15}}>Preguntas ({G.questions.length})</span>
+        <span style={{fontWeight:600, fontSize:15}}>Preguntas ({bank.length})</span>
         <Row>
           <Btn color="green" onClick={()=>dispatch({type:"ADD_Q"})}>+ Agregar</Btn>
           <Btn color="ghost" onClick={()=>{if(confirm("¿Restaurar preguntas por defecto?"))dispatch({type:"RST_Q"})}}>↺ Restaurar</Btn>
         </Row>
       </div>
-      {G.questions.map((q,qi)=>{
+      {bank.map((q,qi)=>{
         const mult = q.multiplier ?? 1;
         return (
           <div key={q.id} style={{background:A.surface,
@@ -1082,9 +1084,9 @@ function EditorTab({ G, dispatch }) {
                       <span style={{fontSize:12, fontWeight:700, color:A.muted, minWidth:18}}>{ai+1}.</span>
                       <input value={a.text} style={{flex:1, minWidth:0}}
                         onChange={e=>dispatch({type:"EDIT_A",i:qi,j:ai,f:"text",v:e.target.value})}/>
-                      <input type="number" value={a.pts} min={1} max={99}
-                        style={{width:44, textAlign:"center", color:A.accent}}
-                        onChange={e=>dispatch({type:"EDIT_A",i:qi,j:ai,f:"pts",v:parseInt(e.target.value)||1})}/>
+                          <input type="number" value={a.pts} min={1} max={999}
+                            style={{width:52, textAlign:"center", color:A.accent}}
+                            onChange={e=>dispatch({type:"EDIT_A",i:qi,j:ai,f:"pts",v:parseInt(e.target.value)||1})}/>
                       {mult>1 && (
                         <span style={{fontSize:11, color:multColor(mult), minWidth:32, fontWeight:700}}>
                           ={a.pts*mult}

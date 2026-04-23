@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "question": "¿Cuál es la comida mexicana más popular?",
+    "answers": [
+      {"text": "Tacos",            "pts": 45},
+      {"text": "Enchiladas",       "pts": 20},
+      {"text": "Tamales",          "pts": 15},
+      {"text": "Pozole",           "pts": 10},
+      {"text": "Chiles en Nogada", "pts":  5},
+      {"text": "Mole",             "pts":  5}
+    ]
+  },
+  {
+    "id": 2,
+    "question": "sex?",
+    "answers": [
+      {"text": "Cerveza",     "pts": 40},
+      {"text": "Tequila",     "pts": 30},
+      {"text": "Mezcal",      "pts": 12},
+      {"text": "Michelada",   "pts": 10},
+      {"text": "Agua fresca", "pts":  5},
+      {"text": "Tepache",     "pts":  3}
+    ]
+  }
+]
