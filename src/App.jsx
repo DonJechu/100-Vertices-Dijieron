@@ -12,18 +12,27 @@ export default function App() {
 
   // Carga preguntas desde /preguntas.json si localStorage no tiene ninguna
   useEffect(()=>{
-    const hasQ = G.questions?.length > 0 && G.questions[0]?.id !== undefined;
-    if (hasQ) return;
     fetch("/preguntas.json")
       .then(r => r.json())
-      .then(qs => {
+      .then(data => {
+        // Soporta formato {version, questions} o array directo
+        const qs      = Array.isArray(data) ? data : data.questions;
+        const version = Array.isArray(data) ? 1    : (data.version ?? 1);
         if (!qs?.length) return;
-        rawSet(prev => {
-          const next = {...prev, questions: qs};
-          const { overlayType, overlayData, ...rest } = next;
-          localStorage.setItem(LS_STATE, JSON.stringify(rest));
-          return next;
-        });
+
+        const savedVersion = parseInt(localStorage.getItem("mxd5_q_version") ?? "0");
+        const hasQ = G.questions?.length > 0 && G.questions[0]?.id !== undefined;
+
+        // Carga si: no hay preguntas, o la versión del JSON es mayor
+        if (!hasQ || version > savedVersion) {
+          localStorage.setItem("mxd5_q_version", String(version));
+          rawSet(prev => {
+            const next = {...prev, questions: qs, questionBank: qs};
+            const { overlayType, overlayData, ...rest } = next;
+            localStorage.setItem(LS_STATE, JSON.stringify(rest));
+            return next;
+          });
+        }
       })
       .catch(()=>{});
   }, []);

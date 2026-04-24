@@ -1,5 +1,6 @@
 [
   {
+    "version": 2,
     "id": 1,
     "question": "¿Cuál es la comida mexicana más popular?",
     "answers": [
@@ -12,6 +13,7 @@
     ]
   },
   {
+    "version": 2,
     "id": 2,
     "question": "sex?",
     "answers": [
