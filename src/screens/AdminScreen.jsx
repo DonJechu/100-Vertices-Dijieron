@@ -3,6 +3,7 @@ import { SHARED_CSS, A, openTab, navigate,
          loadTournament, saveTournament, BLANK_TOURNAMENT,
          loadConfig, saveConfig, DEFAULT_CONFIG } from "../constants.js";
 import { Card, Row, Btn, SmBtn } from "../components/SharedComponents.jsx";
+import { parseQuestions, readTextFile, MAX_ANSWERS } from "../importQuestions.js";
 
 /* ═══════════════════════════════════════════════════
    COLLAPSIBLE SECTION
@@ -74,7 +75,7 @@ function SetupWizard({ onDone }) {
         <div style={{padding:"22px 28px 18px", borderBottom:`1px solid ${A.border}`}}>
           <div style={{fontSize:11, letterSpacing:3, color:A.accent, marginBottom:4}}>CONFIGURACIÓN INICIAL</div>
           <div style={{fontFamily:"'Teko',sans-serif", fontSize:28, color:"#fff", lineHeight:1}}>
-            100 Mexicanos Dijeron
+            100 Vértices Dijeron
           </div>
           {/* Step indicator */}
           <div style={{display:"flex", gap:6, marginTop:14}}>
@@ -491,7 +492,7 @@ export default function AdminScreen({ G, dispatch }) {
         padding:"10px 16px", display:"flex", gap:12, alignItems:"center", flexWrap:"wrap",
         position:"sticky", top:0, zIndex:10}}>
         <span style={{fontFamily:"'Teko',sans-serif", fontWeight:700, fontSize:18,
-          color:A.accent, letterSpacing:.5, flexShrink:0}}>100 Mexicanos</span>
+          color:A.accent, letterSpacing:.5, flexShrink:0}}>100 Vértices</span>
         <div style={{display:"flex", gap:5, flex:1, flexWrap:"wrap"}}>
           {[["game","🎯 Juego"],["torneo","🏆 Torneo"],["editor","✏️ Preguntas"]].map(([t,l])=>(
             <button key={t} onClick={()=>setTab(t)} style={{
@@ -1009,10 +1010,102 @@ function BracketView({ T }) {
 }
 
 /* ═══════════════════════════════════════════════════
+   IMPORTAR PREGUNTAS  (pegar desde Excel o subir CSV)
+═══════════════════════════════════════════════════ */
+function ImportPanel({ bankSize, dispatch, onClose }) {
+  const [text, setText]   = useState("");
+  const [mode, setMode]   = useState("append");
+  const [msg, setMsg]     = useState("");
+  const parsed = text.trim() ? parseQuestions(text) : null;
+  const n = parsed?.questions.length ?? 0;
+
+  const onFile = async (e) => {
+    const f = e.target.files?.[0]; e.target.value = "";
+    if (!f) return;
+    if (/\.xlsx?$/i.test(f.name)) {
+      setMsg("Los archivos .xlsx no se pueden leer aquí: en Excel selecciona las celdas, cópialas (Ctrl+C) y pégalas en el cuadro de abajo, o guarda como CSV.");
+      return;
+    }
+    setMsg(""); setText(await readTextFile(f));
+  };
+
+  const doImport = () => {
+    if (!n) return;
+    if (mode==="replace" && !confirm(`Se borrarán las ${bankSize} preguntas actuales del banco y se cargarán ${n}. ¿Continuar?`)) return;
+    dispatch({type:"IMPORT_Q", qs:parsed.questions, mode});
+    setText(""); setMsg(`✓ Se importaron ${n} preguntas.`);
+  };
+
+  const lbl = {display:"block", fontSize:11, color:A.muted, marginBottom:4, letterSpacing:1};
+  return (
+    <div style={{background:A.surface, border:`1px solid ${A.accent}`, borderRadius:8, padding:14,
+      display:"flex", flexDirection:"column", gap:10}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+        <span style={{fontWeight:600, fontSize:14, color:A.accent}}>📥 Importar preguntas</span>
+        <SmBtn color="ghost" onClick={onClose}>Cerrar</SmBtn>
+      </div>
+      <div style={{fontSize:12, color:A.muted, lineHeight:1.5}}>
+        En Excel selecciona las celdas (con la pregunta, las respuestas y sus puntos), cópialas con Ctrl+C
+        y pégalas aquí. Formato: <b style={{color:A.text}}>Pregunta | Respuesta 1 | Puntos 1 | Respuesta 2 | Puntos 2 …</b>{" "}
+        (una pregunta por fila). También entiende una respuesta por fila. Máximo {MAX_ANSWERS} respuestas por pregunta.
+      </div>
+      <div>
+        <label style={lbl}>PEGAR AQUÍ (o subir un .csv / .txt)</label>
+        <textarea value={text} onChange={e=>{setText(e.target.value); setMsg("");}} rows={6}
+          placeholder={"¿Cuál es la comida favorita?\tTacos\t45\tPizza\t30\tSushi\t15"}
+          style={{width:"100%", resize:"vertical", fontSize:12}}/>
+        <input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" onChange={onFile}
+          style={{marginTop:6, fontSize:12, width:"100%"}}/>
+      </div>
+
+      {msg && <div style={{fontSize:12, color: msg.startsWith("✓")?A.green:A.accent}}>{msg}</div>}
+
+      {parsed && (
+        <div>
+          <div style={{fontSize:12, fontWeight:600, marginBottom:6, color: n?A.green:A.red}}>
+            {n ? `Vista previa: ${n} pregunta${n===1?"":"s"} detectada${n===1?"":"s"}`
+               : "No se detectó ninguna pregunta. Revisa el formato."}
+          </div>
+          {n>0 && (
+            <div style={{maxHeight:200, overflowY:"auto", background:"#111827", border:`1px solid ${A.border}`,
+              borderRadius:6, padding:"6px 10px", fontSize:11, lineHeight:1.6}}>
+              {parsed.questions.map((q,i)=>(
+                <div key={i} style={{marginBottom:4}}>
+                  <span style={{color:A.accent, fontWeight:700}}>{i+1}. </span>{q.question}
+                  <div style={{color:A.muted}}>{q.answers.map(a=>`${a.text} (${a.pts})`).join(" · ")}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {parsed.warnings.length>0 && (
+            <div style={{marginTop:6, fontSize:11, color:"#fbbf24", maxHeight:90, overflowY:"auto"}}>
+              {parsed.warnings.map((w,i)=><div key={i}>⚠ {w}</div>)}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{display:"flex", gap:14, alignItems:"center", flexWrap:"wrap", fontSize:12}}>
+        <label style={{display:"flex", gap:5, alignItems:"center", cursor:"pointer"}}>
+          <input type="radio" checked={mode==="append"} onChange={()=>setMode("append")}/> Agregar al banco ({bankSize} actuales)
+        </label>
+        <label style={{display:"flex", gap:5, alignItems:"center", cursor:"pointer"}}>
+          <input type="radio" checked={mode==="replace"} onChange={()=>setMode("replace")}/> Reemplazar todo el banco
+        </label>
+      </div>
+      <Row>
+        <Btn color="green" onClick={doImport} disabled={!n}>Importar {n>0?`${n} preguntas`:""}</Btn>
+      </Row>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
    EDITOR TAB
 ═══════════════════════════════════════════════════ */
 function EditorTab({ G, dispatch }) {
   const [open, setOpen] = useState(G.currentQ);
+  const [showImport, setShowImport] = useState(false);
 
   const multColor = (m) => m===3?"#7c3aed":m===2?"#ea580c":A.border;
   const multLabel = (m) => m===3?"×3 TRIPLE":m===2?"×2 DOBLE":"×1 Normal";
@@ -1025,9 +1118,11 @@ function EditorTab({ G, dispatch }) {
         <span style={{fontWeight:600, fontSize:15}}>Preguntas ({bank.length})</span>
         <Row>
           <Btn color="green" onClick={()=>dispatch({type:"ADD_Q"})}>+ Agregar</Btn>
+          <Btn color="blue" onClick={()=>setShowImport(v=>!v)}>📥 Importar</Btn>
           <Btn color="ghost" onClick={()=>{if(confirm("¿Restaurar preguntas por defecto?"))dispatch({type:"RST_Q"})}}>↺ Restaurar</Btn>
         </Row>
       </div>
+      {showImport && <ImportPanel bankSize={bank.length} dispatch={dispatch} onClose={()=>setShowImport(false)}/>}
       {bank.map((q,qi)=>{
         const mult = q.multiplier ?? 1;
         return (
@@ -1098,7 +1193,7 @@ function EditorTab({ G, dispatch }) {
                 <Row style={{marginTop:10}}>
                   <SmBtn color="blue" onClick={()=>dispatch({type:"GOTO_Q",v:qi})}>▶ Jugar esta ronda</SmBtn>
                   <SmBtn color="red" onClick={()=>{if(confirm("¿Eliminar?"))dispatch({type:"DEL_Q",i:qi})}}
-                    disabled={G.questions.length<=1}>✕ Eliminar</SmBtn>
+                    disabled={bank.length<=1}>✕ Eliminar</SmBtn>
                 </Row>
               </div>
             )}

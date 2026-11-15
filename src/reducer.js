@@ -104,7 +104,7 @@ export function reducer(S, action) {
     case "NEXT_Q": {
       const qi = S.currentQ+1;
       const limit = S.questionsPerMatch ?? S.questions.length;
-      if (qi >= limit || qi >= S.questions.length) { next = {...S, phase:"gameover"}; break; }
+      if (qi >= limit || qi >= S.questions.length) { SFX.win(); next = {...S, phase:"gameover"}; break; }
       SFX.tick();
       next = {...S, currentQ:qi, revealed:[], roundPts:0, strikes:0, stealMode:false, overlayType:null,
         activeTeam:S.activeTeam==="A"?"B":"A"};
@@ -218,16 +218,34 @@ export function reducer(S, action) {
 
     /* ── Editor ── */
     case "ADD_Q": {
-      const nq = {id:Date.now(), question:"Nueva pregunta…", answers:[
-        {text:"Respuesta 1",pts:30},{text:"Respuesta 2",pts:25},{text:"Respuesta 3",pts:20},
-        {text:"Respuesta 4",pts:15},{text:"Respuesta 5",pts:7},{text:"Respuesta 6",pts:3}]};
-      next = {...S, questions:saveQ([...S.questions,nq])};
+      // El editor trabaja sobre el BANCO (questionBank); si no existe, sobre questions
+      const bank = S.questionBank ?? S.questions;
+      const nid  = bank.reduce((m,q)=>Math.max(m, Number(q.id)||0), 0) + 1;
+      const nq = {id:nid, question:"Nueva pregunta…", answers:[
+        {text:"Respuesta 1",pts:35},{text:"Respuesta 2",pts:25},{text:"Respuesta 3",pts:20},
+        {text:"Respuesta 4",pts:12},{text:"Respuesta 5",pts:8}]};
+      const nb = [...bank, nq];
+      next = S.questionBank ? {...S, questionBank:nb} : {...S, questions:nb};
       break;
     }
     case "DEL_Q": {
-      if (S.questions.length<=1) return S;
-      const qs = saveQ(S.questions.filter((_,i)=>i!==action.i));
-      next = {...S, questions:qs, currentQ:Math.min(S.currentQ,qs.length-1)};
+      const bank = S.questionBank ?? S.questions;
+      if (bank.length<=1) return S;
+      const nb = bank.filter((_,i)=>i!==action.i);
+      next = S.questionBank
+        ? {...S, questionBank:nb}
+        : {...S, questions:nb, currentQ:Math.min(S.currentQ,nb.length-1)};
+      break;
+    }
+    /* Importar varias preguntas de golpe: action.qs = [{question, answers:[{text,pts}]}], action.mode = "append"|"replace" */
+    case "IMPORT_Q": {
+      if (!action.qs?.length) return S;
+      const bank  = action.mode==="replace" ? [] : (S.questionBank ?? S.questions);
+      const start = bank.reduce((m,q)=>Math.max(m, Number(q.id)||0), 0) + 1;
+      const added = action.qs.map((q,i)=>({id:start+i, question:q.question, answers:q.answers}));
+      const nb    = [...bank, ...added];
+      // Si todavía no hay preguntas de juego cargadas, usar las importadas para que el admin no quede vacío
+      next = {...S, questionBank:nb, questions: S.questions?.length ? S.questions : nb};
       break;
     }
     case "EDIT_Q": {
