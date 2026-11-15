@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { SHARED_CSS, openTab, navigate } from "../constants.js";
+import { SHARED_CSS, openTab } from "../constants.js";
+import bgNeon from "../assets/show/bg-neon.gif";
+import logo   from "../assets/show/logo.png";
 
 /* ═══════════════════════════════════════════════════
    HOME SCREEN  ( "/" )
@@ -12,20 +14,14 @@ export default function HomeScreen() {
       gap:28,position:"relative",overflow:"hidden",fontFamily:"'Teko',sans-serif",
     }}>
       <style>{SHARED_CSS}</style>
-      <div style={{position:"absolute",inset:"6px",borderRadius:20,border:"3px solid #7c3aed",
-        boxShadow:"inset 0 0 0 2px #06062a,0 0 80px #8b5cf650",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",inset:0,opacity:0.05,
-        backgroundImage:"radial-gradient(circle,#93c5fd 1px,transparent 1px)",
-        backgroundSize:"22px 22px",pointerEvents:"none"}}/>
+      <img src={bgNeon} alt="" draggable="false"
+        style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",zIndex:0}}/>
+      <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at center,transparent 40%,#05021f99 100%)",zIndex:0}}/>
 
-      <div style={{textAlign:"center",zIndex:1,animation:"logo-pulse 3s ease-in-out infinite"}}>
-        <div style={{fontSize:"clamp(88px,17vw,176px)",color:"#ffd200",lineHeight:.85,fontWeight:700,
-          textShadow:"5px 5px 0 #7f1d1d,0 0 60px #ffd20080",letterSpacing:-4}}>100</div>
-        <div style={{fontSize:"clamp(24px,5vw,54px)",color:"#fff",
-          textShadow:"3px 3px 0 #7f1d1d",letterSpacing:3,marginTop:-6,fontWeight:600}}>MEXICANOS DIJERON</div>
-        <div style={{fontSize:"clamp(12px,2vw,21px)",color:"#f97316",letterSpacing:7,marginTop:6,fontWeight:500}}>
-          el juego de familia
-        </div>
+      <div style={{textAlign:"center",zIndex:1}}>
+        <img src={logo} alt="100 Vértices Dijeron" draggable="false"
+          style={{width:"min(70vw,640px)",maxHeight:"46vh",objectFit:"contain",
+            filter:"drop-shadow(0 12px 30px #000a)"}}/>
       </div>
 
       <div style={{width:"70%",maxWidth:460,height:2,zIndex:1,
