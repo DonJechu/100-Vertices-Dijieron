@@ -36,10 +36,14 @@ export default function HomeScreen() {
           bg="linear-gradient(180deg,#2563eb 0%,#1e3a8a 100%)"
           shadow="#0f2060" glow="#3b82f640"
           onClick={()=>openTab("/game")}/>
+        <HomeBtn label="🎛  PANEL SIMPLE (BACKSTAGE)"
+          bg="linear-gradient(180deg,#475569 0%,#1e293b 100%)"
+          shadow="#0f172a" glow="#64748b40"
+          onClick={()=>openTab("/panel")}/>
       </div>
 
       <p style={{fontFamily:"'Inter',system-ui,sans-serif",fontSize:11,color:"#ffffff28",letterSpacing:2,zIndex:1}}>
-        Abre Admin en una pestaña · Proyector en otra
+        Admin y Proyector en pestañas distintas · el Panel simple es opcional
       </p>
     </div>
   );

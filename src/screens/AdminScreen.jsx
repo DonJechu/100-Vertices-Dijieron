@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { SHARED_CSS, A, openTab, navigate,
          loadTournament, saveTournament, BLANK_TOURNAMENT,
-         loadConfig, saveConfig, DEFAULT_CONFIG } from "../constants.js";
+         loadConfig, saveConfig, DEFAULT_CONFIG, SFX, qKey } from "../constants.js";
 import { Card, Row, Btn, SmBtn } from "../components/SharedComponents.jsx";
 import { parseQuestions, readTextFile, MAX_ANSWERS } from "../importQuestions.js";
 
@@ -538,7 +538,32 @@ export default function AdminScreen({ G, dispatch }) {
             onRename={renameTeam} onSetScore={setScore} onReset={resetAll}
             ROUND_NAMES={ROUND_NAMES}/>
         )}
-        {tab==="editor" && <EditorTab G={G} dispatch={dispatch}/>}
+        {tab==="editor" && <EditorTab G={G} dispatch={dispatch} cfg={cfg} onPlay={()=>setTab("game")}/>}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   SOUNDBOARD — sonidos del show a un clic
+═══════════════════════════════════════════════════ */
+function SoundBoard() {
+  const small = (color) => ({
+    flex:"1 1 110px", padding:"9px 8px", borderRadius:6, cursor:"pointer", fontFamily:"inherit",
+    fontSize:13, fontWeight:600, color, background:"transparent", border:`1px solid ${A.border}`,
+  });
+  return (
+    <div style={{background:A.surface, border:`1px solid ${A.border}`, borderRadius:8, padding:"10px 14px"}}>
+      <div style={{fontSize:10, letterSpacing:2, color:A.muted, marginBottom:8}}>🔊 SONIDOS</div>
+      <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+        <button onClick={()=>SFX.aJugar()} style={{
+          flex:"2 1 200px", padding:"12px 10px", borderRadius:6, cursor:"pointer", fontFamily:"inherit",
+          fontSize:15, fontWeight:700, letterSpacing:1, color:"#111", background:A.accent, border:"none",
+        }}>🎬 ¡A JUGAR!</button>
+        <button onClick={()=>SFX.boton()}      style={small("#c4b5fd")}>🔘 Botón</button>
+        <button onClick={()=>SFX.correcto()}   style={small("#4ade80")}>✔ Correcto</button>
+        <button onClick={()=>SFX.incorrecto()} style={small("#f87171")}>✖ Incorrecto</button>
+        <button onClick={()=>SFX.triunfo()}    style={small("#fcd34d")}>🏆 Triunfo</button>
       </div>
     </div>
   );
@@ -610,6 +635,14 @@ function GameTab({ G, dispatch, q, T, cfg, activePos, onWinner, onSyncScore }) {
           </button>
         ))}
       </div>
+
+      {/* SONIDOS */}
+      <SoundBoard/>
+      {G.qRecycled && (
+        <div style={{fontSize:12, color:"#fbbf24", background:"#78350f22", border:"1px solid #f59e0b55", borderRadius:6, padding:"8px 12px"}}>
+          ⚠ Ya se usaron todas las preguntas del banco: en esta partida se repitieron algunas. Agrega más en la pestaña Preguntas.
+        </div>
+      )}
 
       {/* MARCADOR — click para cambiar turno */}
       <div style={{display:"flex", gap:0, borderRadius:8, overflow:"hidden",
@@ -715,21 +748,34 @@ function FamiliarControls({ G, dispatch, q }) {
           <div style={{padding:"8px 14px", display:"flex", flexDirection:"column", gap:5}}>
             {q.answers.map((a,i)=>{
               const rev=G.revealed.includes(i);
+              const silent = rev && (G.shown??[]).includes(i);   // mostrada sin puntos
               return (
                 <div key={i} style={{display:"flex", alignItems:"center", gap:8,
-                  background:rev?"#14532d18":"transparent", borderRadius:5, padding:"5px 8px",
-                  border:`1px solid ${rev?"#16a34a40":"transparent"}`}}>
+                  background:rev?(silent?"#37415125":"#14532d18"):"transparent", borderRadius:5, padding:"5px 8px",
+                  border:`1px solid ${rev?(silent?"#6b728060":"#16a34a40"):"transparent"}`}}>
                   <span style={{fontWeight:700, color:rev?A.accent:A.muted, minWidth:18, fontSize:13}}>{i+1}</span>
-                  <span style={{flex:1, color:rev?A.text:A.muted, fontSize:13, fontWeight:rev?600:400}}>{a.text}</span>
-                  <span style={{color:A.muted, fontSize:12, minWidth:32, textAlign:"right"}}>{a.pts}p</span>
+                  <span style={{flex:1, color:rev?A.text:A.muted, fontSize:13, fontWeight:rev?600:400}}>
+                    {a.text}
+                    {silent && <span style={{marginLeft:8, fontSize:10, color:A.muted, border:`1px solid ${A.border}`,
+                      borderRadius:4, padding:"1px 6px", letterSpacing:1}}>SIN PUNTOS</span>}
+                  </span>
+                  <span style={{color:A.muted, fontSize:12, minWidth:32, textAlign:"right",
+                    textDecoration:silent?"line-through":"none"}}>{a.pts}p</span>
+                  {!rev && (
+                    <SmBtn color="ghost" onClick={()=>dispatch({type:"SHOW",i})}>👁</SmBtn>
+                  )}
                   <SmBtn color={rev?"ghost":"green"} onClick={()=>dispatch({type:rev?"HIDE":"REVEAL",i})}>
                     {rev?"Ocultar":"▶"}
                   </SmBtn>
                 </div>
               );
             })}
+            <div style={{fontSize:11, color:A.muted, marginTop:2}}>
+              ▶ revela y suma los puntos · 👁 solo muestra la respuesta (sin puntos, sin triunfo)
+            </div>
             <Row style={{marginTop:4}}>
               <Btn color="green" onClick={()=>dispatch({type:"REVEAL_ALL"})}>▶▶ Todas</Btn>
+              <Btn color="ghost" onClick={()=>dispatch({type:"SHOW_ALL"})}>👁 Mostrar restantes</Btn>
               <Btn color="ghost" onClick={()=>dispatch({type:"HIDE_ALL"})}>Ocultar</Btn>
               <Btn color="blue"
                 disabled={G.currentQ>=G.questions.length-1||G.phase==="gameover"}
@@ -1103,7 +1149,7 @@ function ImportPanel({ bankSize, dispatch, onClose }) {
 /* ═══════════════════════════════════════════════════
    EDITOR TAB
 ═══════════════════════════════════════════════════ */
-function EditorTab({ G, dispatch }) {
+function EditorTab({ G, dispatch, cfg, onPlay }) {
   const [open, setOpen] = useState(G.currentQ);
   const [showImport, setShowImport] = useState(false);
 
@@ -1112,27 +1158,43 @@ function EditorTab({ G, dispatch }) {
 
   // Siempre editar el banco completo, no el subconjunto del match activo
   const bank = G.questionBank ?? G.questions;
+
+  // Preguntas ya usadas en el torneo y cuántas harían falta en total
+  const usedSet   = new Set(G.usedQ ?? []);
+  const usedCount = bank.filter(q=>usedSet.has(qKey(q))).length;
+  const need      = Math.max(1, (cfg?.teamCount ?? 8) - 1) * (cfg?.questionsPerMatch ?? 5);
+  const activeKey = G.questions?.[G.currentQ] ? qKey(G.questions[G.currentQ]) : null;
+  const isActive  = q => activeKey!==null && qKey(q)===activeKey;
   return (
     <>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:8}}>
-        <span style={{fontWeight:600, fontSize:15}}>Preguntas ({bank.length})</span>
+        <span style={{fontWeight:600, fontSize:15}}>Preguntas ({bank.length})
+          <span style={{fontWeight:400, fontSize:12, color:A.muted, marginLeft:10}}>· usadas: {usedCount}/{bank.length}</span>
+        </span>
         <Row>
+          {usedCount>0 && <Btn color="ghost" onClick={()=>{if(confirm("¿Marcar todas las preguntas como NO usadas? (por ejemplo, después de probar el sistema)"))dispatch({type:"RESET_USED"})}}>🔄 Liberar usadas</Btn>}
           <Btn color="green" onClick={()=>dispatch({type:"ADD_Q"})}>+ Agregar</Btn>
           <Btn color="blue" onClick={()=>setShowImport(v=>!v)}>📥 Importar</Btn>
           <Btn color="ghost" onClick={()=>{if(confirm("¿Restaurar preguntas por defecto?"))dispatch({type:"RST_Q"})}}>↺ Restaurar</Btn>
         </Row>
       </div>
+      {bank.length<need && (
+        <div style={{fontSize:12, color:"#fbbf24", background:"#78350f22", border:"1px solid #f59e0b55", borderRadius:6, padding:"8px 12px"}}>
+          ⚠ El torneo necesita unas {need} preguntas ({Math.max(1,(cfg?.teamCount??8)-1)} partidas × {cfg?.questionsPerMatch??5}) y el banco tiene {bank.length}:
+          cuando se acaben las nuevas, algunas se repetirán.
+        </div>
+      )}
       {showImport && <ImportPanel bankSize={bank.length} dispatch={dispatch} onClose={()=>setShowImport(false)}/>}
       {bank.map((q,qi)=>{
         const mult = q.multiplier ?? 1;
         return (
           <div key={q.id} style={{background:A.surface,
-            border:`1px solid ${G.currentQ===qi?A.accent:mult>1?multColor(mult):A.border}`,
+            border:`1px solid ${isActive(q)?A.accent:mult>1?multColor(mult):A.border}`,
             borderRadius:8, overflow:"hidden"}}>
             <div onClick={()=>setOpen(open===qi?null:qi)}
               style={{display:"flex", gap:10, alignItems:"center", padding:"10px 14px",
                 cursor:"pointer", userSelect:"none"}}>
-              <span style={{fontWeight:700, color:G.currentQ===qi?A.accent:A.muted, minWidth:28, fontSize:13}}>P{qi+1}</span>
+              <span style={{fontWeight:700, color:isActive(q)?A.accent:A.muted, minWidth:28, fontSize:13}}>P{qi+1}</span>
               <span style={{flex:1, color:A.text, fontSize:12, overflow:"hidden",
                 textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{q.question}</span>
               {mult>1 && (
@@ -1141,7 +1203,11 @@ function EditorTab({ G, dispatch }) {
                   {multLabel(mult)}
                 </span>
               )}
-              {G.currentQ===qi&&(
+              {usedSet.has(qKey(q)) && !isActive(q) && (
+                <span style={{fontSize:10, color:A.muted, border:`1px solid ${A.border}`, borderRadius:4,
+                  padding:"1px 7px", letterSpacing:1}}>USADA</span>
+              )}
+              {isActive(q)&&(
                 <span style={{fontSize:10, color:A.accent, background:"rgba(252,211,77,.1)",
                   border:"1px solid rgba(252,211,77,.3)", borderRadius:4, padding:"1px 7px", letterSpacing:1}}>ACTIVA</span>
               )}
@@ -1191,7 +1257,12 @@ function EditorTab({ G, dispatch }) {
                   ))}
                 </div>
                 <Row style={{marginTop:10}}>
-                  <SmBtn color="blue" onClick={()=>dispatch({type:"GOTO_Q",v:qi})}>▶ Jugar esta ronda</SmBtn>
+                  <SmBtn color="blue" disabled={G.phase==="gameover"||G.qrMode} onClick={()=>{
+                    const enCurso = G.revealed.length>0 || G.roundPts>0 || G.strikes>0;
+                    if (enCurso && !confirm("Esto reinicia la ronda actual (respuestas reveladas, puntos en juego y fallos) y juega esta pregunta. ¿Continuar?")) return;
+                    dispatch({type:"PLAY_Q", i:qi});
+                    onPlay && onPlay();
+                  }}>▶ Jugar esta ronda</SmBtn>
                   <SmBtn color="red" onClick={()=>{if(confirm("¿Eliminar?"))dispatch({type:"DEL_Q",i:qi})}}
                     disabled={bank.length<=1}>✕ Eliminar</SmBtn>
                 </Row>

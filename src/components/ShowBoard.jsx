@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import bgNeon   from "../assets/show/bg-neon.gif";
 import boardImg from "../assets/show/board.png";
+import boardWin from "../assets/show/board-win.gif";
 import strike1  from "../assets/show/strike-1.png";
 import strike2  from "../assets/show/strike-2.png";
 import strike3  from "../assets/show/strike-3.png";
@@ -176,11 +178,15 @@ function NamePlate({ name, cx, state }) {
  *  steal     boolean
  *  strikes   0..3           X que se muestran como overlay (0 = ninguna)
  *  badge     {label, kind}  etiqueta opcional arriba a la izquierda (x2, x3, RÁPIDAS)
+ *  winner    boolean        tablero completo: el panel cambia de colores (GIF animado)
  */
 export default function ShowBoard({
   rows = [], revealed = [], top = 0, left = 0, right = 0,
-  nameA = "", nameB = "", turn = null, steal = false, strikes = 0, badge = null,
+  nameA = "", nameB = "", turn = null, steal = false, strikes = 0, badge = null, winner = false,
 }) {
+  // Precargar el GIF ganador para que no parpadee al cambiar
+  useEffect(() => { const im = new Image(); im.src = boardWin; }, []);
+
   const strike = STRIKE[Math.min(3, Math.max(0, strikes))];
   const stateOf = side => (turn === side ? (steal ? "steal" : "turn") : null);
 
@@ -190,7 +196,7 @@ export default function ShowBoard({
       <img className="sb-bg" src={bgNeon} alt="" draggable="false" />
 
       <div className="sb-stage">
-        <img className="sb-board" src={boardImg} alt="" draggable="false" />
+        <img className="sb-board" src={winner ? boardWin : boardImg} alt="" draggable="false" />
 
         {BAR.tops.map((t, i) => {
           const r = rows[i];

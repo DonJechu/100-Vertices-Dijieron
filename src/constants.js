@@ -1,3 +1,9 @@
+import urlAJugar     from "./assets/audio/a-jugar.mp3";
+import urlBoton      from "./assets/audio/boton.mp3";
+import urlCorrecto   from "./assets/audio/correcto.mp3";
+import urlIncorrecto from "./assets/audio/incorrecto.mp3";
+import urlTriunfo    from "./assets/audio/triunfo.mp3";
+
 export const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Teko:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');`;
 
 export const LS_STATE      = "mxd5_state";
@@ -49,12 +55,35 @@ const beep = (f,d,t="sine",v=0.3,dl=0) => {
     o.start(ac.currentTime+dl); o.stop(ac.currentTime+dl+d+0.05);
   } catch {}
 };
+/* ── Audios reales del show (src/assets/audio) ── */
+const CLIP_URLS = { ajugar:urlAJugar, boton:urlBoton, correcto:urlCorrecto, incorrecto:urlIncorrecto, triunfo:urlTriunfo };
+const clips = {};
+const clip = name => {
+  if (!clips[name]) { const a = new Audio(CLIP_URLS[name]); a.preload = "auto"; clips[name] = a; }
+  return clips[name];
+};
+// Reinicia el clip desde el principio (así un doble disparo no se encima consigo mismo)
+const play = name => {
+  try {
+    const a = clip(name); a.pause(); a.currentTime = 0;
+    const p = a.play(); if (p && p.catch) p.catch(()=>{});   // el navegador puede bloquearlo sin interacción previa
+  } catch {}
+};
+if (typeof window !== "undefined") Object.keys(CLIP_URLS).forEach(clip);   // precarga
+
 export const SFX = {
-  reveal:       ()=>{ beep(660,.08,"sine",.5); beep(880,.1,"sine",.4,.09); beep(1100,.15,"sine",.35,.2); },
-  strike:       ()=>{ beep(180,.3,"sawtooth",.6); beep(130,.35,"sawtooth",.5,.08); },
-  tripleStrike: ()=>{ [0,380,760].forEach(d=>setTimeout(()=>SFX.strike(),d)); setTimeout(()=>{ beep(110,.7,"sawtooth",.55); beep(80,.9,"sawtooth",.45,.12); },1150); },
-  award:        ()=>[784,880,1047,1319].forEach((f,i)=>beep(f,.15,"sine",.45,i*.07)),
-  win:          ()=>[523,587,659,698,784,880,988,1047].forEach((f,i)=>beep(f,.2,"sine",.42,i*.1)),
+  // Soundboard (botones del panel admin)
+  aJugar:       ()=>play("ajugar"),
+  boton:        ()=>play("boton"),
+  correcto:     ()=>play("correcto"),
+  incorrecto:   ()=>play("incorrecto"),
+  triunfo:      ()=>play("triunfo"),
+  // Eventos del juego
+  reveal:       ()=>play("correcto"),
+  strike:       ()=>play("incorrecto"),
+  tripleStrike: ()=>play("incorrecto"),   // las 3 X salen juntas: un solo zumbido
+  award:        ()=>{},                   // repartir puntos: sin sonido (ya suena el triunfo al limpiar el tablero)
+  win:          ()=>play("triunfo"),
   tick:         ()=>beep(1200,.04,"square",.2),
 };
 
@@ -153,6 +182,9 @@ export const SHARED_CSS = `
   @keyframes wizard-in{0%{opacity:0;transform:scale(.96)}100%{opacity:1;transform:scale(1)}}
 `;
 
-export const getRoute  = () => { const p=window.location.pathname; if (p.endsWith("/admin")) return "admin"; if (p.endsWith("/game")) return "game"; return "home"; };
+export const getRoute  = () => { const p=window.location.pathname; if (p.endsWith("/admin")) return "admin"; if (p.endsWith("/game")) return "game"; if (p.endsWith("/panel")) return "panel"; return "home"; };
+
+// Identificador estable de una pregunta (para llevar la cuenta de las ya usadas)
+export const qKey = q => String(q.id ?? q.question);
 export const navigate  = (path) => { window.history.pushState({}, "", path); window.dispatchEvent(new PopStateEvent("popstate")); };
 export const openTab   = (path) => window.open(path,"_blank");

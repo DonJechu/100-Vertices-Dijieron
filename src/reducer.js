@@ -1,4 +1,4 @@
-import { BLANK, DEFAULT_Q, LS_Q, LS_STATE, SFX } from "./constants.js";
+import { BLANK, DEFAULT_Q, LS_Q, LS_STATE, SFX, qKey } from "./constants.js";
 
 export function reducer(S, action) {
   const saveQ = q => q;
@@ -41,17 +41,45 @@ export function reducer(S, action) {
     /* ── Reveal / Strike / Points ── */
     case "REVEAL": {
       if (S.revealed.includes(action.i)) return S;
-      SFX.reveal();
-      const mult = S.questions[S.currentQ].multiplier ?? 1;
-      const pts  = S.questions[S.currentQ].answers[action.i].pts * mult;
-      next = {...S, revealed:[...S.revealed,action.i], roundPts:S.roundPts+pts};
+      const q    = S.questions[S.currentQ];
+      const mult = q.multiplier ?? 1;
+      const pts  = q.answers[action.i].pts * mult;
+      const revealed = [...S.revealed, action.i];
+      // ¿Se acertaron todas las respuestas del tablero (máx. 5 barras)? → ganó la ronda
+      const slots   = Math.min(5, q.answers.length);
+      const cleared = Array.from({length:slots}, (_,k)=>k).every(k=>revealed.includes(k));
+      if (cleared) SFX.triunfo(); else SFX.reveal();
+      next = {...S, revealed, roundPts:S.roundPts+pts, wonQ: cleared ? S.currentQ : null,
+        shown:(S.shown??[]).filter(x=>x!==action.i)};
       break;
     }
     case "HIDE": {
       if (!S.revealed.includes(action.i)) return S;
+      const revealed = S.revealed.filter(x=>x!==action.i);
+      if ((S.shown??[]).includes(action.i)) {            // se mostró "sin puntos": no hay puntos que quitar
+        next = {...S, revealed, shown:S.shown.filter(x=>x!==action.i), wonQ:null};
+        break;
+      }
       const mult = S.questions[S.currentQ].multiplier ?? 1;
       const pts  = S.questions[S.currentQ].answers[action.i].pts * mult;
-      next = {...S, revealed:S.revealed.filter(x=>x!==action.i), roundPts:Math.max(0,S.roundPts-pts)};
+      next = {...S, revealed, roundPts:Math.max(0,S.roundPts-pts), wonQ:null};
+      break;
+    }
+    /* Mostrar una respuesta SIN puntos (el presentador pide revelar las que quedaron
+       sin descubrir cuando la ronda ya se decidió): no suma, no gana, no hay triunfo ni GIF */
+    case "SHOW": {
+      if (S.revealed.includes(action.i)) return S;
+      SFX.reveal();
+      next = {...S, revealed:[...S.revealed, action.i], shown:[...(S.shown??[]), action.i]};
+      break;
+    }
+    case "SHOW_ALL": {
+      const q = S.questions[S.currentQ];
+      const missing = q.answers.map((_,i)=>i).filter(i=>!S.revealed.includes(i));
+      if (!missing.length) return S;
+      SFX.reveal();
+      next = {...S, revealed:q.answers.map((_,i)=>i),
+        shown:[...(S.shown??[]).filter(i=>S.revealed.includes(i)), ...missing]};
       break;
     }
     case "REVEAL_ALL": {
@@ -61,10 +89,11 @@ export function reducer(S, action) {
       if (!missing.length) return S;
       SFX.reveal();
       next = {...S, revealed:q.answers.map((_,i)=>i),
-        roundPts:S.roundPts+missing.reduce((s,i)=>s+q.answers[i].pts*mult,0)};
+        roundPts:S.roundPts+missing.reduce((s,i)=>s+q.answers[i].pts*mult,0), wonQ:null,
+        shown:(S.shown??[]).filter(i=>S.revealed.includes(i))};
       break;
     }
-    case "HIDE_ALL":   next = {...S, revealed:[], roundPts:0}; break;
+    case "HIDE_ALL":   next = {...S, revealed:[], roundPts:0, wonQ:null, shown:[]}; break;
     case "STRIKE": {
       const n = S.strikes+1;
       if (n>=3) {
@@ -95,6 +124,24 @@ export function reducer(S, action) {
     case "CLR_OVERLAY": return {...S, overlayType:null};
 
     /* ── Navigation ── */
+    /* "Jugar esta ronda" del editor: la pregunta viene del BANCO (su posición no sirve en la partida).
+       Si ya está en la partida, salta a ella; si no, ocupa el lugar de la pregunta actual
+       (conservando el ×1/×2/×3 de ese turno, salvo que la pregunta tenga uno propio mayor). */
+    case "PLAY_Q": {
+      if (S.phase==="gameover" || S.qrMode || !S.questions?.length) return S;
+      const bank = S.questionBank ?? S.questions;
+      const bq = bank[action.i];
+      if (!bq) return S;
+      const key   = qKey(bq);
+      const reset = {revealed:[], roundPts:0, strikes:0, stealMode:false, overlayType:null, shown:[], wonQ:null};
+      const idx   = S.questions.findIndex(q=>qKey(q)===key);
+      if (idx >= 0) { next = {...S, ...reset, currentQ:idx}; break; }
+      const slotMult = S.questions[S.currentQ]?.multiplier ?? 1;
+      const mult     = bq.multiplier > 1 ? bq.multiplier : slotMult;
+      const questions = S.questions.map((q,k)=> k===S.currentQ ? {...bq, multiplier:mult} : q);
+      next = {...S, ...reset, questions, usedQ:[...new Set([...(S.usedQ??[]), key])]};
+      break;
+    }
     case "GOTO_Q":
       next = {...S, currentQ:action.v, revealed:[], roundPts:0, strikes:0, stealMode:false, overlayType:null};
       break;
@@ -117,7 +164,8 @@ export function reducer(S, action) {
     case "END":      SFX.win(); next = {...S, phase:"gameover"}; break;
     case "FULL_RST":
       localStorage.removeItem(LS_STATE);
-      next = {...BLANK(S.questions, S.questionsPerMatch), phase:"playing"};
+      next = {...BLANK(S.questions, S.questionsPerMatch), phase:"playing",
+        questionBank:S.questionBank, usedQ:S.usedQ, qRecycled:S.qRecycled};
       break;
 
     /* ── Setup a new match: shuffle bank, apply multipliers, set teams ── */
@@ -135,8 +183,26 @@ export function reducer(S, action) {
       } catch {}
       if (!bank || bank.length === 0) bank = DEFAULT_Q;
 
-      // Shuffle and pick n questions
-      const shuffled = [...bank].sort(() => Math.random() - 0.5).slice(0, n);
+      /* ── Preguntas ya usadas en el torneo: no se repiten hasta agotar el banco ──
+         (se lee SOLO de S.usedQ para que el reducer siga siendo puro, aunque React lo llame dos veces) */
+      const used = new Set(S.usedQ ?? []);
+      // Si se vuelve a cargar una partida que ni siquiera empezó, sus preguntas se liberan (no se "queman")
+      const prev = S.questions ?? [];
+      const unplayed = S.phase==="playing" && !S.qrMode && S.revealed.length===0 && S.currentQ===0 &&
+        S.teamA.score===0 && S.teamB.score===0 && S.strikes===0 && S.roundPts===0;
+      if (unplayed && prev.length && prev.every(q=>used.has(qKey(q)))) prev.forEach(q=>used.delete(qKey(q)));
+
+      const shuffle = arr => { const r=[...arr]; for (let i=r.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [r[i],r[j]]=[r[j],r[i]]; } return r; };
+      let picked = shuffle(bank.filter(q=>!used.has(qKey(q)))).slice(0, n);
+      let recycled = false;
+      if (picked.length < n) {
+        // Ya no quedan suficientes preguntas nuevas: completar con repetidas y empezar un ciclo nuevo
+        recycled = true;
+        picked = [...picked, ...shuffle(bank.filter(q=>!picked.includes(q))).slice(0, n - picked.length)];
+        used.clear();
+      }
+      picked.forEach(q=>used.add(qKey(q)));
+      const shuffled = picked;
 
       // Apply multipliers in configured order (P1→mults[0], P2→mults[1], …)
       const matchQ = shuffled.map((q, i) => ({
@@ -149,6 +215,8 @@ export function reducer(S, action) {
         ...BLANK(bank, n),
         questions:     matchQ,       // preguntas del match actual (shuffleadas)
         questionBank:  bank,         // banco completo para el editor
+        usedQ:         [...used],    // preguntas ya usadas en el torneo
+        qRecycled:     recycled,     // true si en esta partida hubo que repetir preguntas
         questionsPerMatch: n,
         teamA: {name: action.teamA, score: 0},
         teamB: {name: action.teamB, score: 0},
@@ -232,8 +300,9 @@ export function reducer(S, action) {
       const bank = S.questionBank ?? S.questions;
       if (bank.length<=1) return S;
       const nb = bank.filter((_,i)=>i!==action.i);
+      const usedQ = (S.usedQ??[]).filter(k=>k!==qKey(bank[action.i]));
       next = S.questionBank
-        ? {...S, questionBank:nb}
+        ? {...S, questionBank:nb, usedQ}
         : {...S, questions:nb, currentQ:Math.min(S.currentQ,nb.length-1)};
       break;
     }
@@ -245,9 +314,11 @@ export function reducer(S, action) {
       const added = action.qs.map((q,i)=>({id:start+i, question:q.question, answers:q.answers}));
       const nb    = [...bank, ...added];
       // Si todavía no hay preguntas de juego cargadas, usar las importadas para que el admin no quede vacío
-      next = {...S, questionBank:nb, questions: S.questions?.length ? S.questions : nb};
+      next = {...S, questionBank:nb, questions: S.questions?.length ? S.questions : nb,
+        usedQ: action.mode==="replace" ? [] : S.usedQ};
       break;
     }
+    case "RESET_USED": next = {...S, usedQ:[], qRecycled:false}; break;
     case "EDIT_Q": {
       const bank = S.questionBank ?? S.questions;
       const qs = bank.map((q,i)=>i===action.i?{...q,[action.f]:action.v}:q);

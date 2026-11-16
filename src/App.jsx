@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { INIT, CH_NAME, getRoute, unlockAudio, LS_STATE } from "./constants.js";
+import { INIT, CH_NAME, getRoute, unlockAudio, LS_STATE, SFX } from "./constants.js";
 import { reducer } from "./reducer.js";
 import HomeScreen  from "./screens/HomeScreen.jsx";
 import GameScreen  from "./screens/GameScreen.jsx";
 import AdminScreen from "./screens/AdminScreen.jsx";
+import PanelScreen from "./screens/PanelScreen.jsx";
 
 export default function App() {
   const [route, setRoute] = useState(getRoute());
   const [G, rawSet]       = useState(INIT());
   const chRef             = useRef(null);
+  const routeRef          = useRef(route);
+  routeRef.current        = route;
 
   // Carga preguntas desde /preguntas.json si localStorage no tiene ninguna
   useEffect(()=>{
@@ -54,8 +57,30 @@ export default function App() {
     try {
       const ch = new BroadcastChannel(CH_NAME);
       chRef.current = ch;
-      ch.onmessage = e => { if (e.data.t==="S") rawSet(()=>e.data.s); };
-      return () => ch.close();
+      let acked = false, timer, panelTimer;
+
+      ch.onmessage = e => {
+        const m = e.data;
+        if (m.t==="S") rawSet(()=>m.s);
+        // La pantalla del show se abrió o se recargó: el panel admin (que ya tiene
+        // interacción del usuario, así que el navegador sí le deja sonar) reproduce "¡A jugar!"
+        else if (m.t==="SHOW_READY") {
+          if (routeRef.current==="admin") { SFX.aJugar(); ch.postMessage({t:"ACK"}); }
+          else if (routeRef.current==="panel") {
+            // Si también hay un Admin abierto, suena él; el /panel solo suena si nadie responde
+            acked = false; clearTimeout(panelTimer);
+            panelTimer = setTimeout(()=>{ if (!acked) { SFX.aJugar(); ch.postMessage({t:"ACK"}); } }, 250);
+          }
+        }
+        else if (m.t==="ACK") acked = true;
+      };
+
+      if (routeRef.current==="game") {
+        ch.postMessage({t:"SHOW_READY"});
+        // Si no hay un panel admin escuchando, intenta sonar desde aquí (puede que el navegador lo bloquee)
+        timer = setTimeout(()=>{ if (!acked) SFX.aJugar(); }, 700);
+      }
+      return () => { clearTimeout(timer); clearTimeout(panelTimer); ch.close(); };
     } catch {}
   },[]);
 
@@ -68,13 +93,15 @@ export default function App() {
   },[]);
 
   useEffect(()=>{
-    if (!G.overlayType) return;
+    // La pantalla del show NUNCA escribe estado: solo lo recibe (así no pisa acciones del operador)
+    if (!G.overlayType || routeRef.current==="game") return;
     const ms = G.overlayType==="strike" ? 1900 : 1700;
     const t = setTimeout(()=>dispatch({type:"CLR_OVERLAY"}), ms);
     return ()=>clearTimeout(t);
   },[G.overlayType]);
 
   if (route==="admin") return <AdminScreen G={G} dispatch={dispatch}/>;
+  if (route==="panel") return <PanelScreen G={G} dispatch={dispatch}/>;
   if (route==="game")  return <GameScreen  G={G}/>;
   return <HomeScreen/>;
 }

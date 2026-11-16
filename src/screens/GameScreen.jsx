@@ -37,6 +37,12 @@ export default function GameScreen({ G }) {
   const mult = q?.multiplier ?? 1;
   const rows = (q?.answers ?? []).map(a => ({ text: a.text, pts: a.pts * mult }));
 
+  // Tablero completo: el reducer marca wonQ cuando un equipo acierta todas las respuestas
+  // (no cuando el presentador usa "Revelar todas"). Si se oculta alguna, el efecto se quita solo.
+  const slots  = Math.min(5, rows.length);
+  const winner = G.wonQ === G.currentQ && slots > 0 &&
+    Array.from({ length: slots }, (_, k) => k).every(k => G.revealed.includes(k));
+
   // En modo robo, activeTeam es el equipo que está robando (así lo deja el reducer tras 3 X)
   return (
     <ShowBoard
@@ -50,6 +56,7 @@ export default function GameScreen({ G }) {
       turn={G.phase === "gameover" ? null : G.activeTeam}
       steal={G.stealMode}
       strikes={strikeCount(G)}
+      winner={winner}
       badge={mult === 2 ? { label: "×2 DOBLE", kind: "x2" }
            : mult === 3 ? { label: "×3 TRIPLE", kind: "x3" } : null}
     />
